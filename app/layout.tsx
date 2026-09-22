@@ -2,13 +2,12 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { getAppUrl } from '@/lib/app-url';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(getAppUrl()),
   title: 'EMITIA - Facturación Electrónica y Gestión Empresarial | Argentina',
   description: 'Facturación electrónica ARCA, POS, inventario y gestión empresarial para PyMEs argentinas. Emití facturas con CAE real. 100% online.',
   icons: {
