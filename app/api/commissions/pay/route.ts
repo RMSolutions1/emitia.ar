@@ -13,14 +13,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const companyId = (session.user as any).companyId;
-    const userRole = (session.user as any).role;
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, request);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
 
     const body = await request.json();
     const { commissionIds, sellerId, notes } = body;
 
-    // Build where clause with company filter through seller relation
-    const companyWhere = userRole === 'superadmin' ? {} : { seller: { companyId } };
+    const companyWhere = { seller: scoped.where };
 
     let whereClause: Record<string, unknown> = {};
     

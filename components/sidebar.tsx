@@ -8,7 +8,6 @@ import {
   ShoppingCart, 
   Package, 
   Users, 
-  FileText,
   Menu,
   X,
   Building2,
@@ -40,7 +39,6 @@ import {
   Inbox,
   HandCoins,
   CircleDollarSign,
-  FileMinus,
   Contact,
   Warehouse,
   SlidersHorizontal,
@@ -79,8 +77,6 @@ const baseNavItems: NavItem[] = [
       { name: 'Facturas de venta', href: '/facturas', icon: Receipt },
       { name: 'Facturas recurrentes', href: '/facturacion/recurrentes', icon: Repeat },
       { name: 'Cobranzas', href: '/ingresos/cobranzas', icon: HandCoins },
-      { name: 'Nota de crédito A', href: '/facturacion/emitir?documentCode=003', icon: FileMinus },
-      { name: 'Nota de crédito B', href: '/facturacion/emitir?documentCode=008', icon: FileMinus },
       { name: 'Presupuestos', href: '/presupuestos', icon: FileCheck },
       { name: 'Remitos', href: '/facturacion/remito', icon: Truck },
       { name: 'Emitir factura', href: '/facturacion/emitir', icon: FileSpreadsheet },
@@ -94,8 +90,6 @@ const baseNavItems: NavItem[] = [
       { name: 'Facturas de proveedores', href: '/gastos/facturas-proveedor', icon: Receipt },
       { name: 'Pagos', href: '/gastos/pagos', icon: CircleDollarSign },
       { name: 'Órdenes de compra', href: '/compras', icon: Truck },
-      { name: 'Nota de débito A', href: '/facturacion/emitir?documentCode=002', icon: FileMinus },
-      { name: 'Nota de débito B', href: '/facturacion/emitir?documentCode=007', icon: FileMinus },
       { name: 'Suscripciones', href: '/suscripciones', icon: RefreshCw },
     ],
   },
@@ -133,7 +127,6 @@ const baseNavItems: NavItem[] = [
       { name: 'Libro IVA', href: '/libro-iva', icon: BookOpen },
     ],
   },
-  { name: 'Ventas', href: '/ventas', icon: FileText },
   { name: 'Reportes', href: '/reportes', icon: BarChart3 },
   { name: 'Mis tareas', href: '/tareas', icon: ListTodo },
   { name: 'Vendedores', href: '/vendedores', icon: UserCheck },
@@ -179,12 +172,12 @@ const superadminItems: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession() || {};
+  const { data: session, status } = useSession();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const userRole = (session?.user as any)?.role || 'user';
+  const userRole = status === 'loading' ? '' : (session?.user as { role?: string } | undefined)?.role || 'user';
 
   // Filtrar items según el rol del usuario
   const navItems = useMemo(() => {

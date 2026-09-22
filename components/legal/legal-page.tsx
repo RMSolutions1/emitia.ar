@@ -32,7 +32,7 @@ export function LegalPage({ title, updated, children }: LegalPageProps) {
           <Link href="/privacidad" className="hover:text-gray-900">Privacidad</Link>
           <Link href="/terminos" className="hover:text-gray-900">Términos</Link>
           <Link href="/login" className="hover:text-gray-900">Iniciar sesión</Link>
-          <span className="text-gray-400">CUIT: 20-40154622-8</span>
+          <span className="text-gray-400">EMITIA · Argentina</span>
         </div>
       </footer>
     </div>

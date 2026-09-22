@@ -3,8 +3,8 @@
  * npx tsx scripts/audit-ux-pages.ts
  */
 const BASE = process.env.AUDIT_BASE_URL || 'https://www.emitia.com.ar';
-const EMAIL = process.env.AUDIT_LOGIN_EMAIL || 'admin@emitia.com.ar';
-const PASSWORD = process.env.AUDIT_LOGIN_PASSWORD || 'Emitia2026!';
+const EMAIL = process.env.AUDIT_LOGIN_EMAIL || '';
+const PASSWORD = process.env.AUDIT_LOGIN_PASSWORD || '';
 
 const PAGES: { path: string; area: string; expect?: RegExp }[] = [
   { path: '/dashboard', area: 'Inicio', expect: /Resumen|Dashboard|ventas/i },

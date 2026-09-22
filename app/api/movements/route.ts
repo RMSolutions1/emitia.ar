@@ -21,9 +21,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const companyId = (session.user as { companyId?: string }).companyId;
-    const userRole = (session.user as { role?: string }).role;
-    const isSuperadmin = userRole === 'superadmin';
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, request);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.where.companyId;
+    const isSuperadmin = false;
 
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     const accounts = await prisma.bankAccount.findMany({
       where: {
-        ...(isSuperadmin || !companyId ? {} : { companyId }),
+        ...(isSuperadmin ? {} : { companyId }),
         ...(bankAccountId ? { id: bankAccountId } : {}),
         isActive: true,
       },

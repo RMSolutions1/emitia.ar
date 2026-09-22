@@ -3,8 +3,8 @@
  * npx tsx scripts/audit-production-public.ts
  */
 const BASE = process.env.AUDIT_BASE_URL || 'https://www.emitia.com.ar';
-const EMAIL = process.env.AUDIT_LOGIN_EMAIL || 'admin@emitia.com.ar';
-const PASSWORD = process.env.AUDIT_LOGIN_PASSWORD || 'Emitia2026!';
+const EMAIL = process.env.AUDIT_LOGIN_EMAIL || '';
+const PASSWORD = process.env.AUDIT_LOGIN_PASSWORD || '';
 
 type Result = { name: string; status: 'ok' | 'warn' | 'fail'; detail?: string };
 

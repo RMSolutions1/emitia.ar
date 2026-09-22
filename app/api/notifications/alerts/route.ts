@@ -13,15 +13,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ alerts: [], counts: { total: 0, critical: 0, warning: 0, info: 0 } });
     }
 
-    const user = session.user as any;
-    const companyId = user.companyId;
-    const userRole = user.role || 'user';
-
-    if (!companyId && userRole !== 'superadmin') {
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, request);
+    if (!tenant) {
       return NextResponse.json({ alerts: [], counts: { total: 0, critical: 0, warning: 0, info: 0 } });
     }
-
-    const companyFilter = userRole === 'superadmin' ? {} : { companyId };
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) {
+      return NextResponse.json({ alerts: [], counts: { total: 0, critical: 0, warning: 0, info: 0 }, needsCompany: true });
+    }
+    const companyFilter = scoped.where;
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

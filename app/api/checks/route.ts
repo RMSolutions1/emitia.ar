@@ -12,15 +12,23 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const isSuperadmin = (session.user as any).role === 'superadmin';
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.where.companyId;
+    const isSuperadmin = false;
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type');
     const status = searchParams.get('status');
 
     const where: any = {};
-    if (!isSuperadmin && companyId) {
+    if (!isSuperadmin) {
+      if (!companyId) {
+        return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
+      }
       where.companyId = companyId;
     }
     if (type) where.type = type;

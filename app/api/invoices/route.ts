@@ -14,8 +14,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const isSuperadmin = (session.user as any).role === 'superadmin';
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.where.companyId;
+    const isSuperadmin = false;
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
@@ -23,7 +28,10 @@ export async function GET(req: Request) {
     const endDate = searchParams.get('endDate');
 
     const where: any = {};
-    if (!isSuperadmin && companyId) {
+    if (!isSuperadmin) {
+      if (!companyId) {
+        return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
+      }
       where.companyId = companyId;
     }
     if (status) where.status = status;
@@ -133,7 +141,12 @@ export async function POST(req: Request) {
 
     // Get next invoice number from AFIP (authoritative source)
     const company = await prisma.company.findUnique({ where: { id: companyId } });
-    const pos = pointOfSale || company?.defaultPOS || 1;
+    const pos = pointOfSale || company?.defaultPOS;
+    if (!pos || pos < 1) {
+      return NextResponse.json({
+        error: 'Configurá el punto de venta que tu comercio delegó a EMITIA.',
+      }, { status: 400 });
+    }
     const cbteTipo = parseInt(finalDocumentCode);
 
     let sequenceNumber = company?.nextInvoiceNum || 1;

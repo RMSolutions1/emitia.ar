@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { NotificationBell } from './notification-bell';
 import { CommandPalette } from './command-palette';
+import { CompanySwitcher } from './company-switcher';
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: 'Super Admin',
@@ -27,7 +28,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function AppTopBar() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,7 +39,7 @@ export function AppTopBar() {
     | undefined;
   const companyName = user?.companyName;
   const companyPlan = user?.companyPlan || 'free';
-  const role = user?.role || 'user';
+  const role = status === 'loading' ? '' : user?.role || 'user';
 
   const planLabel =
     companyPlan === 'empresa' ? 'Empresa' :
@@ -86,7 +87,7 @@ export function AppTopBar() {
       </button>
 
       <div className="flex flex-1 items-center justify-end gap-1.5">
-        {/* Badge de empresa y plan */}
+        {role === 'superadmin' && <CompanySwitcher />}
         {companyName && (
           <div className="hidden items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1 md:flex">
             <Building2 className="h-3.5 w-3.5 shrink-0 text-gray-400" />

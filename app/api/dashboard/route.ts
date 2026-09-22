@@ -4,20 +4,39 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
 import { startOfDay, startOfMonth, subDays, subMonths, endOfDay, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getTenantFromRequest, tenantWhere } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const userRole = (session.user as any).role;
-    const companyFilter = userRole === 'superadmin' ? {} : { companyId };
-    const userName = (session.user as any)?.name || 'Usuario';
+    const scoped = tenantWhere(tenant);
+    const userName = (session?.user as { name?: string | null } | undefined)?.name || 'Usuario';
+    if (!scoped.ok) {
+      return NextResponse.json({
+        needsCompany: true,
+        userName,
+        todayRevenue: 0,
+        todayCount: 0,
+        monthRevenue: 0,
+        monthCount: 0,
+        totalProducts: 0,
+        totalCustomers: 0,
+        pendingInvoicesCount: 0,
+        chartData: [],
+        monthlyChartData: [],
+        topProducts: [],
+        recentSales: [],
+        onboarding: null,
+      });
+    }
+    const companyFilter = scoped.where;
 
     const now = new Date();
     const today = startOfDay(now);
@@ -379,6 +398,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const activeCompany = await prisma.company.findUnique({
+      where: { id: companyFilter.companyId },
+      select: { cuit: true, defaultPOS: true },
+    });
+
     return NextResponse.json({
       userName,
       // KPIs
@@ -432,6 +456,14 @@ export async function GET(req: NextRequest) {
         customersWithSales,
         totalSalesInvoicesMonth,
         salesTrend: Math.round(monthTrend),
+      },
+      needsCompany: false,
+      onboarding: {
+        hasCuit: (activeCompany?.cuit || '').replace(/\D/g, '').length === 11,
+        hasPos: (activeCompany?.defaultPOS || 0) > 0,
+        hasProducts: totalProducts > 0,
+        hasCustomers: totalCustomers > 0,
+        hasInvoices: totalInvoicesMonth > 0 || pendingInvoicesCount > 0,
       },
     });
   } catch (error) {

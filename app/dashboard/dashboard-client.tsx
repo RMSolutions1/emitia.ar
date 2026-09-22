@@ -51,6 +51,14 @@ interface DashboardData {
   topClients: Array<{ name: string; total: number; count: number }>;
   caeAlerts: Array<{ id: string; invoiceNumber: string; customerName: string; total: number; caeExpiration: string }>;
   unpaidInvoicesList: Array<{ id: string; invoiceNumber: string; customerName: string; total: number; date: string }>;
+  needsCompany?: boolean;
+  onboarding?: {
+    hasCuit: boolean;
+    hasPos: boolean;
+    hasProducts: boolean;
+    hasCustomers: boolean;
+    hasInvoices: boolean;
+  } | null;
   businessSummary?: {
     accountsReceivable: number;
     receivableCurrent: number;
@@ -194,6 +202,40 @@ export function DashboardClient() {
           </h1>
         </div>
       </div>
+
+      {data.needsCompany && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-5">
+          <p className="font-semibold text-violet-900">Elegí una empresa para operar</p>
+          <p className="mt-1 text-sm text-violet-800">
+            El superadmin no usa un comercio propio. Seleccioná un tenant en la barra superior o crealo en Administración.
+          </p>
+          <a href="/admin/empresas" className="mt-3 inline-flex text-sm font-semibold text-violet-700 underline">
+            Ir a empresas
+          </a>
+        </div>
+      )}
+
+      {data.onboarding && !(data.onboarding.hasCuit && data.onboarding.hasPos && data.onboarding.hasProducts && data.onboarding.hasCustomers) && (
+        <div className="rounded-xl border border-blue-100 bg-white p-5">
+          <p className="font-semibold text-gray-900">Primer día en EMITIA</p>
+          <p className="mt-1 text-sm text-gray-500">Completá estos pasos para emitir con CAE a nombre de tu comercio.</p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {[
+              { ok: data.onboarding.hasCuit, href: '/configuracion', label: 'CUIT fiscal del comercio' },
+              { ok: data.onboarding.hasPos, href: '/configuracion/puntos-venta', label: 'Punto de venta delegado' },
+              { ok: data.onboarding.hasProducts, href: '/inventario', label: 'Primer producto' },
+              { ok: data.onboarding.hasCustomers, href: '/contactos', label: 'Primer cliente' },
+              { ok: data.onboarding.hasInvoices, href: '/facturacion/emitir', label: 'Primera factura' },
+            ].map((step) => (
+              <li key={step.label}>
+                <a href={step.href} className={step.ok ? 'text-emerald-700' : 'text-blue-700 hover:underline'}>
+                  {step.ok ? 'Listo' : 'Pendiente'} · {step.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Resumen del negocio — estilo Alegra */}
       {data.businessSummary && (

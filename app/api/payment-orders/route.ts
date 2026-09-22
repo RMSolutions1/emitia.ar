@@ -5,19 +5,18 @@ import prisma from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const companyId = (session.user as { companyId?: string }).companyId;
-    const isSuperadmin = (session.user as { role?: string }).role === 'superadmin';
-
-    let filter: Record<string, unknown> = {};
-    if (!isSuperadmin && companyId) {
-      const suppliers = await prisma.supplier.findMany({ where: { companyId }, select: { id: true } });
-      filter = { supplierId: { in: suppliers.map((s) => s.id) } };
-    }
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const suppliers = await prisma.supplier.findMany({ where: scoped.where, select: { id: true } });
+    const filter: Record<string, unknown> = { supplierId: { in: suppliers.map((s) => s.id) } };
 
     const orders = await prisma.paymentOrder.findMany({
       where: filter,

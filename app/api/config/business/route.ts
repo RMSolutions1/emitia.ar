@@ -2,48 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { getTenantFromRequest, tenantWhere } from '@/lib/tenant';
+import { encrypt } from '@/lib/encryption';
 
-// GET - Obtener configuración del negocio (datos de la empresa del usuario)
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
-    // Si es superadmin y no tiene empresa, retornar config vacía
-    if (userRole === 'superadmin' && !userCompanyId) {
-      return NextResponse.json({
-        id: null,
-        businessName: 'Sistema ERP',
-        legalName: 'Sistema de Gestión Empresarial',
-        cuit: null,
-        address: null,
-        city: null,
-        province: null,
-        postalCode: null,
-        phone: null,
-        email: null,
-        website: null,
-        logo: null,
-        currency: 'ARS',
-        taxRate: 21,
-        invoicePrefix: 'FAC',
-        defaultPOS: 1,
-        condicionIva: 'responsable_inscripto',
-        iibb: null
-      });
-    }
-
-    if (!userCompanyId) {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) {
+      return NextResponse.json({ needsCompany: true, id: null, businessName: '', legalName: '', defaultPOS: null, cuit: null });
     }
 
     const company = await prisma.company.findUnique({
-      where: { id: userCompanyId }
+      where: { id: scoped.where.companyId }
     });
 
     if (!company) {
@@ -93,16 +69,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
-    // Solo company_admin y superadmin pueden editar
-    if (userRole !== 'company_admin' && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Sin permisos para editar' }, { status: 403 });
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-
-    if (!userCompanyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
+    if (tenant.role !== 'company_admin' && tenant.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Sin permisos para editar' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -133,7 +105,8 @@ export async function PUT(req: NextRequest) {
       companyId
     } = body;
 
-    const targetCompanyId = userRole === 'superadmin' && companyId ? companyId : userCompanyId;
+    const scoped = tenantWhere(tenant);
+    const targetCompanyId = (tenant.isSuperadmin && companyId) ? companyId : scoped.ok ? scoped.where.companyId : null;
 
     if (!targetCompanyId) {
       return NextResponse.json({ error: 'ID de empresa requerido' }, { status: 400 });
@@ -160,8 +133,12 @@ export async function PUT(req: NextRequest) {
     if (iibb !== undefined) updateData.iibb = iibb;
     if (inicioActividades !== undefined) updateData.fechaInicioActividad = inicioActividades ? new Date(inicioActividades) : null;
     if (actividadPrincipal !== undefined) updateData.actividadPrincipal = actividadPrincipal;
-    if (afipCertificate !== undefined) updateData.afipCertificate = afipCertificate;
-    if (afipPrivateKey !== undefined) updateData.afipPrivateKey = afipPrivateKey;
+    if (afipCertificate !== undefined && afipCertificate && !String(afipCertificate).includes('***')) {
+      updateData.afipCertificate = encrypt(afipCertificate);
+    }
+    if (afipPrivateKey !== undefined && afipPrivateKey && !String(afipPrivateKey).includes('***')) {
+      updateData.afipPrivateKey = encrypt(afipPrivateKey);
+    }
     if (afipEnvironment !== undefined) updateData.afipEnvironment = afipEnvironment;
 
     const company = await prisma.company.update({

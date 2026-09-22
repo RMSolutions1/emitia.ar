@@ -451,7 +451,7 @@ export default function LandingPage({ stats }: { stats?: PublicStats | null }) {
             <div className="col-span-2 md:col-span-1">
               <BrandLogo variant="white" size="md" href="/" className="mb-4" />
               <p className="text-sm leading-relaxed">Facturación electrónica y ERP para PyMEs argentinas.</p>
-              <p className="mt-3 text-xs text-gray-500">CUIT: 20-40154622-8</p>
+              <p className="mt-3 text-xs text-gray-500">Hecho en Argentina</p>
             </div>
             <div>
               <h4 className="text-white font-semibold text-sm mb-4">Producto</h4>

@@ -26,14 +26,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const userRole = (session.user as any).role;
-
-    if (!companyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Sin empresa asignada' }, { status: 403 });
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.where.companyId;
 
-    // Modelo delegación: obtener CUIT de la empresa para consultas AFIP
     const companyCuit = await getCompanyCuit(companyId);
 
     const { searchParams } = new URL(req.url);
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     }
 
     const documentType = getDocumentType(cleanDoc);
-    const companyFilter = userRole === 'superadmin' ? {} : { companyId };
+    const companyFilter = scoped.where;
 
     // Step 1: Search local database
     const localCustomer = await prisma.customer.findFirst({

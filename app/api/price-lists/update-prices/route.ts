@@ -13,9 +13,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const companyId = (session.user as any).companyId;
-    const userRole = (session.user as any).role;
-    const companyFilter = userRole === 'superadmin' ? {} : { companyId };
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, request);
+    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyFilter = scoped.where;
 
     const body = await request.json();
     const { priceListId, percentage, operation, categoryId, applyToBase } = body;

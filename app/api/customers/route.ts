@@ -15,16 +15,14 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') ?? '';
 
-    // Multi-tenant: filtrar por empresa del usuario
-    const companyId = (session.user as any).companyId;
-    const isSuperadmin = (session.user as any).role === 'superadmin';
-
-    const where: any = {};
-
-    // Solo filtrar por companyId si no es superadmin y tiene companyId
-    if (!isSuperadmin && companyId) {
-      where.companyId = companyId;
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, req);
+    if (!tenant) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const where: any = { ...scoped.where };
 
     if (search) {
       where.OR = [

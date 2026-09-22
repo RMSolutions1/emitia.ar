@@ -13,9 +13,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const userRole = (session.user as any).role;
-    const companyFilter = userRole === 'superadmin' ? {} : { companyId };
+    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
+    const tenant = getTenantFromRequest(session, request);
+    if (!tenant) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    const scoped = tenantWhere(tenant);
+    if (!scoped.ok) return scoped.response;
+    const companyFilter = scoped.where;
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'sales';

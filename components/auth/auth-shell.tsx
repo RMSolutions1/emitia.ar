@@ -65,7 +65,7 @@ export function AuthShell({
                 ))}
               </ul>
             </div>
-            <p className="text-blue-300/80 text-xs">© 2026 EMITIA · CUIT 20-40154622-8</p>
+            <p className="text-blue-300/80 text-xs">© 2026 EMITIA · Facturación electrónica Argentina</p>
           </div>
         </div>
 
