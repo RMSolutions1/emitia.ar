@@ -13,11 +13,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
-    const tenant = getTenantFromRequest(session, request);
-    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const scoped = tenantWhere(tenant);
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, request);
     if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
     const companyFilter = scoped.where;
 
     const body = await request.json();
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest) {
       if (!priceList) {
         return NextResponse.json({ error: 'Lista no encontrada' }, { status: 404 });
       }
-      if (userRole !== 'superadmin' && priceList.companyId !== companyId) {
+      if (priceList.companyId !== companyId) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
       }
 

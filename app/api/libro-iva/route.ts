@@ -11,8 +11,10 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const companyId = (session.user as any).companyId;
-    if (!companyId) return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     const { searchParams } = new URL(req.url);
     const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1));

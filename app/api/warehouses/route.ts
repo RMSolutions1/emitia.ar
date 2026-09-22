@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { requireTenant } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,13 +21,14 @@ async function ensureDefaultWarehouse(companyId: string) {
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
-    const companyId = (session.user as { companyId?: string }).companyId;
-    if (!companyId) return NextResponse.json({ error: 'Sin empresa' }, { status: 403 });
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     await ensureDefaultWarehouse(companyId);
 
@@ -59,8 +61,9 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
-    const companyId = (session.user as { companyId?: string }).companyId;
-    if (!companyId) return NextResponse.json({ error: 'Sin empresa' }, { status: 403 });
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     const body = await req.json();
     const { name, code, address, city, notes, isDefault } = body;

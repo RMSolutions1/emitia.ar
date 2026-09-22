@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { DEFAULT_CHART_ACCOUNTS } from '@/lib/chart-accounts-default';
+import { requireTenant } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,18 +22,14 @@ async function ensureDefaultAccounts(companyId: string) {
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
-    const companyId = (session.user as { companyId?: string }).companyId;
-    const role = (session.user as { role?: string }).role;
-    if (!companyId && role !== 'superadmin') {
-      return NextResponse.json({ error: 'Sin empresa' }, { status: 403 });
-    }
-
-    const targetCompanyId = companyId!;
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const targetCompanyId = scoped.companyId;
     await ensureDefaultAccounts(targetCompanyId);
 
     const accounts = await prisma.chartAccount.findMany({
@@ -52,8 +49,9 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
-    const companyId = (session.user as { companyId?: string }).companyId;
-    if (!companyId) return NextResponse.json({ error: 'Sin empresa' }, { status: 403 });
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     const body = await req.json();
     const { code, name, type, parentCode } = body;

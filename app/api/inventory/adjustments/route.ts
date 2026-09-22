@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const companyId = (session.user as { companyId?: string }).companyId;
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
     const body = await req.json();
     const { productId, type, quantity, reason } = body;
 

@@ -7,22 +7,19 @@ import { encrypt, decrypt, maskSecret } from '@/lib/encryption';
 import { getMPUserInfo, validateMPAccessToken } from '@/lib/mercadopago';
 
 // GET - Obtener configuraciones de API del usuario
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
-    if (!userCompanyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
-    }
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
 
     const configs = await prisma.apiConfiguration.findMany({
-      where: userCompanyId ? { companyId: userCompanyId } : undefined,
+      where: scoped.where,
       orderBy: { createdAt: 'desc' }
     });
 
@@ -74,16 +71,13 @@ export async function POST(req: NextRequest) {
     }
 
     const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
-    // Solo admin puede configurar APIs
     if (userRole !== 'company_admin' && userRole !== 'superadmin') {
       return NextResponse.json({ error: 'Sin permisos para configurar APIs' }, { status: 403 });
     }
 
-    if (!userCompanyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
-    }
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
 
     const body = await req.json();
     const {
@@ -95,7 +89,6 @@ export async function POST(req: NextRequest) {
       webhookSecret,
       environment,
       isActive,
-      companyId: targetCompanyId,
       mpUserId,
       mpPosId,
       metadata: rawMetadata,
@@ -106,11 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = String(rawProvider).toLowerCase();
-    const finalCompanyId = userRole === 'superadmin' && targetCompanyId ? targetCompanyId : userCompanyId;
-
-    if (!finalCompanyId) {
-      return NextResponse.json({ error: 'ID de empresa requerido' }, { status: 400 });
-    }
+    const finalCompanyId = scoped.companyId;
 
     const existing = await prisma.apiConfiguration.findFirst({
       where: {
@@ -216,11 +205,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
     if (userRole !== 'company_admin' && userRole !== 'superadmin') {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
     }
+
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
 
     const { searchParams } = new URL(req.url);
     const provider = searchParams.get('provider');
@@ -240,17 +231,17 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: 'Configuración no encontrada' }, { status: 404 });
       }
 
-      if (userRole !== 'superadmin' && config.companyId !== userCompanyId) {
+      if (config.companyId !== scoped.companyId) {
         return NextResponse.json({ error: 'Sin acceso a esta configuración' }, { status: 403 });
       }
 
       await prisma.apiConfiguration.delete({
         where: { id: configId }
       });
-    } else if (provider && userCompanyId) {
+    } else if (provider) {
       await prisma.apiConfiguration.deleteMany({
         where: {
-          companyId: userCompanyId,
+          companyId: scoped.companyId,
           provider: { equals: provider.toLowerCase(), mode: 'insensitive' },
         }
       });

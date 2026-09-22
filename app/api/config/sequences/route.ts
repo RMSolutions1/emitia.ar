@@ -2,23 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { requireTenant } from '@/lib/tenant';
 
 // GET - Obtener secuencias de documentos
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
-    if (!userCompanyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
-    }
-
-    const where = userCompanyId ? { companyId: userCompanyId } : undefined;
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const where = scoped.where;
 
     const sequences = await prisma.documentSequence.findMany({
       where,
@@ -40,29 +36,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
+    const userRole = (session.user as { role?: string })?.role;
     if (userRole !== 'company_admin' && userRole !== 'superadmin') {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
     }
 
-    if (!userCompanyId && userRole !== 'superadmin') {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
-    }
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
 
     const body = await req.json();
-    const { documentCode, pointOfSale, nextNumber, companyId: targetCompanyId } = body;
+    const { documentCode, pointOfSale, nextNumber } = body;
 
     if (!documentCode || pointOfSale === undefined) {
       return NextResponse.json({ error: 'documentCode y pointOfSale requeridos' }, { status: 400 });
     }
 
-    const finalCompanyId = userRole === 'superadmin' && targetCompanyId ? targetCompanyId : userCompanyId;
-
-    if (!finalCompanyId) {
-      return NextResponse.json({ error: 'ID de empresa requerido' }, { status: 400 });
-    }
+    const finalCompanyId = scoped.companyId;
 
     const sequence = await prisma.documentSequence.upsert({
       where: {
@@ -98,12 +87,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    const userCompanyId = (session.user as any)?.companyId;
-
+    const userRole = (session.user as { role?: string })?.role;
     if (userRole !== 'company_admin' && userRole !== 'superadmin') {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
     }
+
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -121,7 +111,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Secuencia no encontrada' }, { status: 404 });
     }
 
-    if (userRole !== 'superadmin' && sequence.companyId !== userCompanyId) {
+    if (sequence.companyId !== scoped.companyId) {
       return NextResponse.json({ error: 'Sin acceso' }, { status: 403 });
     }
 

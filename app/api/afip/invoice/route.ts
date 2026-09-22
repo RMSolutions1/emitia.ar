@@ -18,14 +18,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, request);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
+
     const body = await request.json();
-    const { cuit: afipCuit, environment } = getAFIPCredentials();
-    
-    // Modelo delegación: usar CUIT de la empresa del usuario
-    const companyId = (session.user as any).companyId;
+    const { environment } = getAFIPCredentials();
+
     const companyCuit = await getCompanyCuit(companyId);
-    // El CUIT para el QR y comprobante es el de la empresa (si existe), no el de EMITIA
-    const cuitEmisor = companyCuit || afipCuit;
+    if (!companyCuit) {
+      return NextResponse.json({
+        error: 'Completá el CUIT de este comercio antes de solicitar CAE.',
+      }, { status: 400 });
+    }
+    const cuitEmisor = companyCuit;
 
     // Build invoice request
     let cbtesAsociados = body.cbtesAsociados;

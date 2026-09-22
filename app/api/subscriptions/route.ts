@@ -67,10 +67,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    if (!companyId) {
-      return NextResponse.json({ error: 'Usuario sin empresa asignada' }, { status: 403 });
-    }
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, req);
+    if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     const body = await req.json();
     const { name, customerId, customerName, amount, frequency, dayOfMonth, startDate, endDate, invoiceType, items, notes } = body;

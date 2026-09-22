@@ -81,6 +81,20 @@ export function tenantWhere(
   return { ok: true, where: { companyId: tenant.companyId } };
 }
 
+/** Sesión + empresa activa (cookie/query para superadmin). Para GET y POST. */
+export function requireTenant(
+  session: Session | null,
+  req?: { headers?: Headers; url?: string },
+):
+  | { ok: true; tenant: TenantContext; companyId: string; where: { companyId: string } }
+  | { ok: false; response: NextResponse } {
+  const tenant = getTenantFromRequest(session, req);
+  if (!tenant) return { ok: false, response: unauthorized() };
+  const scoped = tenantWhere(tenant);
+  if (!scoped.ok) return scoped;
+  return { ok: true, tenant, companyId: scoped.where.companyId, where: scoped.where };
+}
+
 export function canAccessCompany(
   tenant: TenantContext,
   resourceCompanyId: string | null | undefined,

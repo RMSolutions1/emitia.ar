@@ -13,11 +13,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { getTenantFromRequest, tenantWhere } = await import('@/lib/tenant');
-    const tenant = getTenantFromRequest(session, request);
-    if (!tenant) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    const scoped = tenantWhere(tenant);
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, request);
     if (!scoped.ok) return scoped.response;
+    const companyId = scoped.companyId;
 
     const body = await request.json();
     const { commissionIds, sellerId, notes } = body;
@@ -29,14 +28,11 @@ export async function POST(request: NextRequest) {
     if (commissionIds && commissionIds.length > 0) {
       whereClause = { id: { in: commissionIds }, status: 'pending', ...companyWhere };
     } else if (sellerId) {
-      // Verify seller belongs to company
-      if (userRole !== 'superadmin') {
-        const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
-        if (!seller || seller.companyId !== companyId) {
-          return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
-        }
+      const seller = await prisma.seller.findUnique({ where: { id: sellerId } });
+      if (!seller || seller.companyId !== companyId) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
       }
-      whereClause = { sellerId, status: 'pending' };
+      whereClause = { sellerId, status: 'pending', ...companyWhere };
     } else {
       return NextResponse.json({ error: 'Debe especificar comisiones o vendedor' }, { status: 400 });
     }

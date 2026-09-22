@@ -12,8 +12,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const companyId = (session.user as any).companyId;
-    const companyCuit = await getCompanyCuit(companyId);
+    const { requireTenant } = await import('@/lib/tenant');
+    const scoped = requireTenant(session, request);
+    if (!scoped.ok) return scoped.response;
+    const companyCuit = await getCompanyCuit(scoped.companyId);
 
     const { searchParams } = new URL(request.url);
     const puntoVenta = parseInt(searchParams.get('ptoVta') || '1');

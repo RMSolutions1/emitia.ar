@@ -76,9 +76,10 @@ export async function GET(request: Request) {
 
     if (type === 'products') {
       // Get products for this company first, then filter saleItems
-      const companyProducts = userRole === 'superadmin'
-        ? await prisma.product.findMany({ select: { id: true } })
-        : await prisma.product.findMany({ where: { companyId }, select: { id: true } });
+      const companyProducts = await prisma.product.findMany({
+        where: companyFilter,
+        select: { id: true },
+      });
       const productIds = companyProducts.map(p => p.id);
 
       const topProducts = await prisma.saleItem.groupBy({
