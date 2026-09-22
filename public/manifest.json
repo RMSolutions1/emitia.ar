@@ -1,0 +1,25 @@
+{
+  "name": "EMITIA - Facturación y Gestión",
+  "short_name": "EMITIA",
+  "description": "Facturación electrónica ARCA, POS, inventario y gestión empresarial para PyMEs argentinas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e3a8a",
+  "lang": "es-AR",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo-emitia-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

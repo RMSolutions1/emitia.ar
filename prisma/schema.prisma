@@ -1,0 +1,1045 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MULTI-EMPRESA / MULTI-TENANT
+// ============================================
+
+// Empresa/Compañía
+model Company {
+  id                  String   @id @default(cuid())
+  name                String   // Nombre comercial
+  legalName           String?  // Razón social
+  cuit                String?  @unique
+  iibb                String?  // Ingresos Brutos
+  actividadPrincipal  String?
+  fechaInicioActividad DateTime?
+  condicionIva        String   @default("responsable_inscripto")
+  address             String?
+  city                String?
+  province            String?
+  postalCode          String?
+  phone               String?
+  email               String?
+  website             String?
+  logo                String?
+  currency            String   @default("ARS")
+  taxRate             Float    @default(21)
+  invoicePrefix       String   @default("FAC")
+  nextInvoiceNum      Int      @default(1)
+  nextTicketNum       Int      @default(1)
+  defaultPOS          Int      @default(1)
+  afipCertificate     String?  @db.Text
+  afipPrivateKey      String?  @db.Text
+  afipEnvironment     String   @default("testing")
+  maxUsers            Int      @default(5) // Límite de usuarios
+  maxPOS              Int      @default(3) // Límite de puntos de venta
+  plan                String   @default("free") // free, gestion, empresa
+  status              String   @default("active") // active, suspended, blocked
+  trialEndsAt         DateTime?
+  
+  // SUSCRIPCIÓN Y PAGOS
+  subscriptionPrice   Float    @default(0) // Precio mensual del plan
+  billingCycle        String   @default("monthly") // monthly, yearly
+  billingDayOfMonth   Int      @default(1) // Día del mes para facturación
+  nextBillingDate     DateTime?
+  lastPaymentDate     DateTime?
+  daysOverdue         Int      @default(0)
+  paymentMethod       String?  // "manual" | "mercadopago" | "transferencia"
+  paymentStatus       String   @default("pending") // pending, paid, overdue, cancelled
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relaciones
+  users               User[]
+  products            Product[]
+  categories          Category[]
+  customers           Customer[]
+  suppliers           Supplier[]
+  sales               Sale[]
+  invoices            Invoice[]
+  tickets             Ticket[]
+  purchaseOrders      PurchaseOrder[]
+  cashRegisters       CashRegister[]
+  quotes              Quote[]
+  priceLists          PriceList[]
+  sellers             Seller[]
+  subscriptions       Subscription[]
+  bankAccounts        BankAccount[]
+  checks              Check[]
+  apiConfigurations   ApiConfiguration[]
+  documentSequences   DocumentSequence[]
+  warehouses          Warehouse[]
+  chartAccounts       ChartAccount[]
+  journalEntries      JournalEntry[]
+
+  @@index([status])
+  @@index([cuit])
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("user") // superadmin, company_admin, user
+  companyId     String?   // Null para superadmin
+  company       Company?  @relation(fields: [companyId], references: [id])
+  status        String    @default("active") // active, inactive, blocked
+  lastLoginAt   DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([role])
+  @@index([status])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ERP models
+model Category {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([companyId])
+}
+
+model Product {
+  id                 String              @id @default(cuid())
+  companyId          String
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  sku                String
+  barcode            String?
+  price              Float
+  cost               Float               @default(0)
+  stock              Int                 @default(0)
+  minStock           Int                 @default(10)
+  categoryId         String?
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  image              String?
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  saleItems          SaleItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stockMovements     StockMovement[]
+  suppliers          Supplier[]          @relation("ProductSuppliers")
+
+  @@unique([companyId, sku])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([barcode])
+}
+
+model Customer {
+  id              String           @id @default(cuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  document        String?
+  documentType    String?          // DNI, CUIT, CUIL
+  address         String?
+  city            String?
+  province        String?
+  taxCondition    String?          // responsable_inscripto, monotributista, consumidor_final, exento
+  notes           String?
+  sellerId        String?          // Vendedor asignado
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  sales           Sale[]
+  account         CustomerAccount?
+  priceLists      CustomerPriceList[]
+
+  @@unique([companyId, document])
+  @@index([companyId])
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  saleNumber    String
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  sellerId      String?    // Vendedor que realizó la venta
+  userId        String?    // Usuario que realizó la venta
+  subtotal      Float
+  tax           Float      @default(0)
+  discount      Float      @default(0)
+  total         Float
+  paymentMethod String
+  cashReceived  Float?
+  change        Float?
+  notes         String?
+  status        String     @default("completed")
+  isCredit      Boolean    @default(false) // Venta a cuenta corriente
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  items         SaleItem[]
+
+  @@unique([companyId, saleNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([sellerId])
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  discount  Float    @default(0)
+  subtotal  Float
+  createdAt DateTime @default(now())
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Proveedores
+model Supplier {
+  id             String           @id @default(cuid())
+  companyId      String
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  cuit           String?
+  notes          String?
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  purchaseOrders PurchaseOrder[]
+  products       Product[]        @relation("ProductSuppliers")
+  account        SupplierAccount?
+
+  @@unique([companyId, cuit])
+  @@index([companyId])
+}
+
+// Órdenes de Compra
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  companyId    String
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orderNumber  String
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  subtotal     Float
+  tax          Float               @default(0)
+  total        Float
+  status       String              @default("pending") // pending, received, cancelled
+  notes        String?
+  expectedDate DateTime?
+  receivedDate DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  items        PurchaseOrderItem[]
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitCost        Float
+  subtotal        Float
+  receivedQty     Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+// Movimientos de Stock
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  type        String   // in, out, adjustment
+  quantity    Int
+  reason      String?
+  reference   String?  // sale_id, purchase_order_id, etc
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([type])
+}
+
+// Caja Diaria
+model CashRegister {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pointOfSale  Int      @default(1)
+  openingDate  DateTime @default(now())
+  closingDate  DateTime?
+  openingCash  Float
+  closingCash  Float?
+  totalSales   Float    @default(0)
+  totalCash    Float    @default(0)
+  totalCard    Float    @default(0)
+  totalTransfer Float   @default(0)
+  status       String   @default("open") // open, closed
+  notes        String?
+  userId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+// Configuración de APIs por empresa (multi-tenant)
+model ApiConfiguration {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider        String   // mercadopago, stripe, paypal, afip
+  displayName     String   // Nombre visible
+  accessToken     String?  @db.Text // Token encriptado
+  publicKey       String?  @db.Text // Clave pública
+  secretKey       String?  @db.Text // Clave secreta encriptada
+  webhookSecret   String?  @db.Text
+  environment     String   @default("sandbox") // sandbox, production
+  isActive        Boolean  @default(true)
+  metadata        String?  @db.Text // JSON con config adicional
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, provider])
+  @@index([companyId])
+  @@index([provider])
+  @@index([isActive])
+}
+
+// Facturas / Comprobantes
+// Tipos de Comprobante ARCA (AFIP):
+// Tipo A (Resp. Inscripto a Resp. Inscripto): 001-Factura, 002-ND, 003-NC, 051-Factura con retención
+// Tipo B (Resp. Inscripto a CF/Exento): 006-Factura, 007-ND, 008-NC, 009-Recibo
+// Tipo C (Monotrib/Exentos): 011-Factura, 012-ND, 013-NC, 015-Recibo, 016-NVC
+// Exportación: 019-Factura, 020-ND, 021-NC
+
+model Invoice {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoiceNumber   String
+  documentCode    String   @default("006") // Código ARCA: 001, 006, 011, etc.
+  documentType    String   @default("factura") // factura, nota_debito, nota_credito, recibo
+  saleId          String?
+  customerId      String?
+  customerName    String
+  customerDocument String?
+  customerTaxCondition String @default("consumidor_final") // responsable_inscripto, consumidor_final, monotributista, exento
+  customerAddress String?
+  invoiceType     String   @default("B") // A, B, C, E (export)
+  pointOfSale     Int      @default(1)
+  sequenceNumber  Int      @default(1) // Número correlativo por PdV y tipo
+  cae             String?  // Código Autorización Electrónica AFIP
+  caeExpiration   DateTime?
+  subtotal        Float
+  taxNetAmount    Float?   // Base imponible
+  tax             Float    @default(0)
+  taxRate         Float    @default(21) // IVA 21%
+  otherTaxes      Float    @default(0) // Otros impuestos
+  exemptAmount    Float    @default(0) // Monto exento
+  total           Float
+  status          String   @default("emitida") // emitida, anulada, pendiente, enviada_afip
+  linkedInvoiceId String?  // Para NC/ND referenciando factura original
+  concept         Int      @default(1) // 1: Productos, 2: Servicios, 3: Productos y Servicios
+  serviceStartDate DateTime?
+  serviceEndDate   DateTime?
+  paymentDueDate   DateTime?
+  observations    String?  @db.Text
+  items           Json?    // Array de items del comprobante [{name, quantity, unitPrice, discount, ivaRate, ivaAmount, subtotal}]
+  pdfUrl          String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, invoiceNumber, documentCode])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([documentCode])
+  @@index([pointOfSale, invoiceType])
+}
+
+// Ticket de Venta (Comprobante no fiscal)
+model Ticket {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ticketNumber    String
+  pointOfSale     Int      @default(1)
+  sequenceNumber  Int
+  saleId          String?
+  customerId      String?
+  customerName    String?
+  total           Float
+  subtotal        Float
+  discount        Float    @default(0)
+  paymentMethod   String   @default("efectivo")
+  cashReceived    Float?
+  change          Float?
+  items           Json     // Array de items del ticket
+  status          String   @default("emitido") // emitido, anulado
+  cashRegisterId  String?
+  userId          String?
+  userName        String?
+  observations    String?
+  pdfUrl          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, ticketNumber])
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([pointOfSale])
+  @@index([status])
+}
+
+// Transacciones de Pago (MercadoPago, Stripe, etc)
+model PaymentTransaction {
+  id                String   @id @default(cuid())
+  saleId            String?
+  provider          String   // mercadopago, stripe, paypal, cash
+  externalId        String?  // ID del proveedor
+  preferenceId      String?  // ID de preferencia (MP)
+  status            String   @default("pending") // pending, approved, rejected, cancelled, refunded
+  statusDetail      String?
+  amount            Float
+  currency          String   @default("ARS")
+  paymentMethodId   String?  // visa, master, etc
+  paymentTypeId     String?  // credit_card, debit_card, etc
+  installments      Int      @default(1)
+  fee               Float    @default(0)
+  netAmount         Float?
+  payerEmail        String?
+  payerDocument     String?
+  checkoutUrl       String?  @db.Text
+  qrCode            String?  @db.Text
+  metadata          String?  @db.Text
+  webhookReceived   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([saleId])
+  @@index([provider])
+  @@index([status])
+  @@index([externalId])
+}
+
+// Secuencias por tipo de documento y punto de venta (por empresa)
+model DocumentSequence {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documentCode    String   // 001, 006, 011, etc.
+  pointOfSale     Int      @default(1)
+  nextNumber      Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, documentCode, pointOfSale])
+  @@index([companyId])
+  @@index([documentCode])
+}
+
+// ============================================
+// CUENTAS CORRIENTES
+// ============================================
+
+// Cuenta Corriente de Cliente
+model CustomerAccount {
+  id              String   @id @default(cuid())
+  customerId      String   @unique
+  customer        Customer @relation(fields: [customerId], references: [id])
+  creditLimit     Float    @default(0)
+  balance         Float    @default(0) // Positivo = debe, Negativo = a favor
+  lastMovementAt  DateTime?
+  status          String   @default("active") // active, suspended, blocked
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  movements       AccountMovement[]
+}
+
+// Cuenta Corriente de Proveedor
+model SupplierAccount {
+  id              String   @id @default(cuid())
+  supplierId      String   @unique
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  balance         Float    @default(0) // Positivo = debemos, Negativo = a favor nuestro
+  lastMovementAt  DateTime?
+  status          String   @default("active")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  movements       AccountMovement[]
+}
+
+// Movimientos de Cuenta Corriente (unificado)
+model AccountMovement {
+  id                String           @id @default(cuid())
+  type              String           // debit (cargo), credit (abono)
+  concept           String           // sale, payment, credit_note, debit_note, adjustment
+  description       String
+  amount            Float
+  balance           Float            // Saldo después del movimiento
+  referenceType     String?          // sale, invoice, receipt, payment_order
+  referenceId       String?
+  dueDate           DateTime?
+  customerAccountId String?
+  customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id])
+  supplierAccountId String?
+  supplierAccount   SupplierAccount? @relation(fields: [supplierAccountId], references: [id])
+  createdAt         DateTime         @default(now())
+
+  @@index([customerAccountId])
+  @@index([supplierAccountId])
+  @@index([concept])
+  @@index([dueDate])
+}
+
+// Recibos de Cobro
+model Receipt {
+  id              String        @id @default(cuid())
+  receiptNumber   String        @unique
+  customerId      String
+  customerName    String
+  date            DateTime      @default(now())
+  totalAmount     Float
+  notes           String?
+  status          String        @default("completed") // completed, cancelled
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  items           ReceiptItem[]
+
+  @@index([customerId])
+}
+
+model ReceiptItem {
+  id            String   @id @default(cuid())
+  receiptId     String
+  receipt       Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  paymentMethod String   // cash, check, transfer, card
+  amount        Float
+  reference     String?  // número de cheque, transferencia, etc
+  bankName      String?
+  checkNumber   String?
+  checkDate     DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([receiptId])
+}
+
+// Órdenes de Pago a Proveedores
+model PaymentOrder {
+  id              String             @id @default(cuid())
+  orderNumber     String             @unique
+  supplierId      String
+  supplierName    String
+  date            DateTime           @default(now())
+  totalAmount     Float
+  notes           String?
+  status          String             @default("completed") // completed, cancelled
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  items           PaymentOrderItem[]
+
+  @@index([supplierId])
+}
+
+model PaymentOrderItem {
+  id            String       @id @default(cuid())
+  paymentOrderId String
+  paymentOrder  PaymentOrder @relation(fields: [paymentOrderId], references: [id], onDelete: Cascade)
+  paymentMethod String       // cash, check, transfer
+  amount        Float
+  reference     String?
+  bankName      String?
+  checkNumber   String?
+  checkDate     DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([paymentOrderId])
+}
+
+// ============================================
+// CHEQUES Y TESORERÍA
+// ============================================
+
+model Check {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type            String   // received (recibido), issued (emitido)
+  checkNumber     String
+  bankName        String
+  bankCode        String?
+  amount          Float
+  issueDate       DateTime
+  dueDate         DateTime
+  payee           String?  // A quien va dirigido (emitidos)
+  drawer          String?  // Quien lo emitió (recibidos)
+  cuit            String?
+  status          String   @default("in_portfolio") // in_portfolio, deposited, cashed, rejected, endorsed, cancelled
+  endorsedTo      String?
+  endorseDate     DateTime?
+  depositDate     DateTime?
+  depositAccount  String?
+  rejectionReason String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankName      String
+  accountNumber String
+  cbu           String?
+  alias         String?
+  accountType   String   // checking, savings
+  currency      String   @default("ARS")
+  balance       Float    @default(0)
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  movements     BankMovement[]
+
+  @@unique([companyId, cbu])
+  @@index([companyId])
+}
+
+model BankMovement {
+  id            String      @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  type          String      // deposit, withdrawal, transfer_in, transfer_out, fee, interest
+  concept       String
+  description   String?
+  amount        Float
+  balance       Float       // Saldo después del movimiento
+  reference     String?
+  date          DateTime    @default(now())
+  reconciled    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  @@index([bankAccountId])
+  @@index([date])
+}
+
+// ============================================
+// PRESUPUESTOS Y ÓRDENES DE VENTA
+// ============================================
+
+model Quote {
+  id              String      @id @default(cuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quoteNumber     String
+  customerId      String?
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  subtotal        Float
+  tax             Float       @default(0)
+  discount        Float       @default(0)
+  total           Float
+  validUntil      DateTime
+  status          String      @default("pending") // pending, approved, rejected, expired, converted
+  convertedToSale String?     // ID de la venta si se convirtió
+  notes           String?
+  terms           String?     // Condiciones
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           QuoteItem[]
+
+  @@unique([companyId, quoteNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model QuoteItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String?
+  productName String
+  productSku  String?
+  quantity    Int
+  unitPrice   Float
+  discount    Float    @default(0)
+  subtotal    Float
+  createdAt   DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+// ============================================
+// LISTAS DE PRECIOS
+// ============================================
+
+model PriceList {
+  id          String          @id @default(cuid())
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  currency    String          @default("ARS")
+  isDefault   Boolean         @default(false)
+  isActive    Boolean         @default(true)
+  validFrom   DateTime?
+  validUntil  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       PriceListItem[]
+  customers   CustomerPriceList[]
+
+  @@index([companyId])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  price       Float
+  minQuantity Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([priceListId, productId, minQuantity])
+  @@index([priceListId])
+  @@index([productId])
+}
+
+model CustomerPriceList {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([customerId, priceListId])
+  @@index([customerId])
+}
+
+// ============================================
+// VENDEDORES Y COMISIONES
+// ============================================
+
+model Seller {
+  id              String       @id @default(cuid())
+  companyId       String
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId          String?      // Vinculado a usuario del sistema
+  name            String
+  email           String?
+  phone           String?
+  document        String?
+  commissionRate  Float        @default(0) // Porcentaje de comisión
+  fixedCommission Float        @default(0) // Comisión fija por venta
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  commissions     Commission[]
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+}
+
+model Commission {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id])
+  saleId      String
+  saleNumber  String
+  saleTotal   Float
+  rate        Float    // Porcentaje aplicado
+  amount      Float    // Monto de comisión
+  status      String   @default("pending") // pending, paid, cancelled
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([sellerId])
+  @@index([saleId])
+  @@index([status])
+}
+
+// ============================================
+// FACTURACIÓN RECURRENTE / SUSCRIPCIONES
+// ============================================
+
+model Subscription {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  customerId      String
+  customerName    String
+  amount          Float
+  currency        String   @default("ARS")
+  frequency       String   // weekly, monthly, quarterly, yearly
+  dayOfMonth      Int?     // Día del mes para cobrar (1-28)
+  startDate       DateTime
+  endDate         DateTime?
+  nextBillingDate DateTime
+  lastBilledDate  DateTime?
+  invoiceType     String   @default("B")
+  status          String   @default("active") // active, paused, cancelled, completed
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           SubscriptionItem[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([nextBillingDate])
+}
+
+model SubscriptionItem {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  description    String
+  quantity       Int          @default(1)
+  unitPrice      Float
+  createdAt      DateTime     @default(now())
+
+  @@index([subscriptionId])
+}
+
+// ============================================
+// NOTIFICACIONES WHATSAPP
+// ============================================
+
+model WhatsAppMessage {
+  id            String   @id @default(cuid())
+  phone         String
+  customerName  String?
+  type          String   // invoice, reminder, quote, receipt, custom
+  referenceType String?  // invoice, quote, receipt
+  referenceId   String?
+  message       String   @db.Text
+  status        String   @default("pending") // pending, sent, delivered, read, failed
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  @@index([phone])
+  @@index([status])
+  @@index([type])
+}
+
+// ============================================
+// IMPORTACIONES MASIVAS
+// ============================================
+
+model ImportJob {
+  id           String   @id @default(cuid())
+  type         String   // products, customers, suppliers, prices
+  fileName     String
+  totalRows    Int      @default(0)
+  processedRows Int     @default(0)
+  successRows  Int      @default(0)
+  errorRows    Int      @default(0)
+  status       String   @default("pending") // pending, processing, completed, failed
+  errors       String?  @db.Text // JSON con errores
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  @@index([status])
+  @@index([type])
+}
+
+// Facturación Recurrente
+model RecurringInvoice {
+  id                 String   @id @default(cuid())
+  companyId          String
+  customerId         String?
+  customerName       String
+  customerDocument   String?
+  customerTaxCondition String @default("consumidor_final")
+  customerAddress    String?
+  documentCode       String   @default("006")
+  invoiceType        String   @default("B")
+  pointOfSale        Int      @default(1)
+  concept            Int      @default(2)
+  items              Json
+  subtotal           Float
+  tax                Float    @default(0)
+  total              Float
+  frequency          String   @default("monthly")
+  dayOfMonth         Int      @default(1)
+  nextEmissionDate   DateTime
+  lastEmissionDate   DateTime?
+  startDate          DateTime
+  endDate            DateTime?
+  observations       String?  @db.Text
+  isActive           Boolean  @default(true)
+  totalEmitted       Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([isActive])
+  @@index([nextEmissionDate])
+}
+
+// ============================================
+// CONTABILIDAD Y DEPÓSITOS
+// ============================================
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  code      String
+  address   String?
+  city      String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+model ChartAccount {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  type       String   // activo, pasivo, patrimonio, ingreso, egreso
+  parentCode String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([type])
+}
+
+model JournalEntry {
+  id          String         @id @default(cuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entryNumber String
+  date        DateTime
+  description String
+  reference   String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  lines       JournalLine[]
+
+  @@unique([companyId, entryNumber])
+  @@index([companyId])
+  @@index([date])
+}
+
+model JournalLine {
+  id          String       @id @default(cuid())
+  entryId     String
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountCode String
+  accountName String
+  debit       Float        @default(0)
+  credit      Float        @default(0)
+
+  @@index([entryId])
+}

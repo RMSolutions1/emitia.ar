@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 40" fill="none" role="img" aria-label="EMITIA">
+  <defs>
+    <linearGradient id="emitia-grad" x1="4" y1="4" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="emitia-text" x1="48" y1="8" x2="164" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E3A8A"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="36" height="36" rx="10" fill="url(#emitia-grad)"/>
+  <path d="M12 12h16a1.5 1.5 0 0 1 0 3H15v4h11a1.5 1.5 0 0 1 0 3H15v4h13a1.5 1.5 0 0 1 0 3H12V12z" fill="#fff"/>
+  <circle cx="30" cy="10" r="3" fill="#A5F3FC" stroke="#fff" stroke-width="1.2"/>
+  <text x="48" y="28" fill="url(#emitia-text)" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="22" font-weight="800" letter-spacing="0.06em">EMITIA</text>
+</svg>

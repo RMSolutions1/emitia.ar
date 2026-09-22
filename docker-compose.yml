@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: emitia-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: emitia
+      POSTGRES_PASSWORD: emitia_dev_local
+      POSTGRES_DB: emitia_dev
+    ports:
+      - "5434:5432"
+    volumes:
+      - emitia_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emitia -d emitia_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  emitia_dev_pgdata:
