@@ -6,6 +6,8 @@ import { getAppUrl } from '@/lib/app-url';
 
 const inter = Inter({ subsets: ['latin'] });
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   metadataBase: new URL(getAppUrl()),
   title: 'EMITIA - Facturación Electrónica y Gestión Empresarial | Argentina',
