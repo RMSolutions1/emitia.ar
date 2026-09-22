@@ -1,13 +1,9 @@
 import NextAuth from 'next-auth';
-import type { NextRequest } from 'next/server';
 import { authOptions } from '@/lib/auth';
-import { bindAuthUrlToRequest } from '@/lib/auth-env';
+import { sanitizeAuthEnv } from '@/lib/auth-env';
 
-const nextAuth = NextAuth(authOptions);
+sanitizeAuthEnv();
 
-async function handler(req: NextRequest, context: { params: { nextauth: string[] } }) {
-  bindAuthUrlToRequest(req);
-  return nextAuth(req, context);
-}
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
