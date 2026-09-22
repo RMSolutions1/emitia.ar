@@ -1,11 +1,12 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import prisma from './db';
+import { sanitizeAuthEnv } from './auth-env';
+
+sanitizeAuthEnv();
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -112,6 +113,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
     signOut: '/cerrar-sesion',
+    error: '/login',
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

@@ -28,8 +28,21 @@ const authMiddleware = withAuth({
 });
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  const host = req.headers.get('host') || '';
+  if (host === 'emitia.ar') {
+    const url = req.nextUrl.clone();
+    url.hostname = 'www.emitia.ar';
+    url.protocol = 'https:';
+    return NextResponse.redirect(url, 308);
+  }
+
   const { pathname } = req.nextUrl;
-  if (pathname.startsWith('/api/health') || pathname.startsWith('/api/auth')) {
+  if (
+    pathname.startsWith('/api/health') ||
+    pathname.startsWith('/api/auth') ||
+    publicPages.has(pathname) ||
+    pathname.startsWith('/guias')
+  ) {
     return NextResponse.next();
   }
   return authMiddleware(req as never, event);

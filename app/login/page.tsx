@@ -17,6 +17,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get('error');
+    if (authError === 'Configuration') {
+      setError('Error de configuración de autenticación. Recargá la página e intentá de nuevo.');
+    } else if (authError && authError !== 'undefined') {
+      setError('No se pudo iniciar sesión. Verificá tus datos e intentá de nuevo.');
+    }
+
     fetch('/api/health/db')
       .then((r) => r.json())
       .then((data) => {
@@ -48,6 +56,8 @@ export default function LoginPage() {
           setError('No existe una cuenta con ese email.');
         } else if (result.error === 'Contraseña incorrecta') {
           setError('Contraseña incorrecta.');
+        } else if (result.error === 'Configuration' || result.error === 'NEXTAUTH_URL') {
+          setError('Error de configuración de autenticación. Recargá la página e intentá de nuevo.');
         } else {
           setError(result.error);
         }

@@ -1,3 +1,11 @@
+function sanitizeAuthEnv() {
+  for (const key of ['NEXTAUTH_URL', 'NEXTAUTH_SECRET']) {
+    const value = process.env[key];
+    if (value) process.env[key] = String(value).replace(/[\r\n\t]/g, '').trim();
+  }
+}
+sanitizeAuthEnv();
+
 function resolveAppUrl() {
   const raw = (process.env.NEXTAUTH_URL || '').trim();
   if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, '');
@@ -25,9 +33,6 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: { unoptimized: true },
-  env: {
-    NEXTAUTH_URL: appUrl,
-  },
 };
 
 module.exports = nextConfig;
