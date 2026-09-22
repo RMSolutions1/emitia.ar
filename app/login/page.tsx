@@ -34,7 +34,7 @@ export default function LoginPage() {
       const health = await fetch('/api/health/db');
       const healthData = await health.json();
       if (!healthData.ok) {
-        setError('No se puede conectar a la base de datos. Verificá que PostgreSQL esté activo (npm run db:local).');
+        setError('No se puede conectar a la base de datos. En Vercel, DATABASE_URL tiene que ser un PostgreSQL público (Neon), no localhost.');
         setLoading(false);
         return;
       }
@@ -43,7 +43,7 @@ export default function LoginPage() {
 
       if (result?.error) {
         if (result.error === 'DB_CONNECTION_ERROR') {
-          setError('No se puede conectar a la base de datos. Verificá que PostgreSQL esté activo (npm run db:local).');
+          setError('No se puede conectar a la base de datos. En Vercel, DATABASE_URL tiene que ser un PostgreSQL público (Neon), no localhost.');
         } else if (result.error === 'Usuario no encontrado') {
           setError('No existe una cuenta con ese email.');
         } else if (result.error === 'Contraseña incorrecta') {
@@ -79,7 +79,7 @@ export default function LoginPage() {
           <p className="font-semibold">Base de datos no accesible</p>
           <p className="mt-1 text-amber-700">{dbWarning}</p>
           <p className="mt-2 text-xs">
-            Desarrollo local: <code className="bg-amber-100 px-1 rounded">npm run db:local</code>
+            En producción usá un PostgreSQL público (Neon). En local: <code className="bg-amber-100 px-1 rounded">npm run db:local</code>
           </p>
         </div>
       )}
