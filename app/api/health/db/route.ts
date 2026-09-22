@@ -7,7 +7,8 @@ export async function GET() {
   const start = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ ok: true, latencyMs: Date.now() - start });
+    const users = await prisma.user.count();
+    return NextResponse.json({ ok: true, latencyMs: Date.now() - start, users });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error de conexión';
     const isTimeout = message.includes('Timed out') || message.includes('connection pool');

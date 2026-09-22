@@ -21,8 +21,6 @@ export default function LoginPage() {
     const authError = params.get('error');
     if (authError === 'Configuration') {
       setError('Error de configuración de autenticación. Recargá la página e intentá de nuevo.');
-    } else if (authError && authError !== 'undefined') {
-      setError('No se pudo iniciar sesión. Verificá tus datos e intentá de nuevo.');
     }
 
     fetch('/api/health/db')
@@ -49,20 +47,22 @@ export default function LoginPage() {
 
       const result = await signIn('credentials', { redirect: false, email, password });
 
-      if (result?.error) {
-        if (result.error === 'DB_CONNECTION_ERROR') {
-          setError('No se puede conectar a la base de datos. En Vercel, DATABASE_URL tiene que ser un PostgreSQL público (Neon), no localhost.');
-        } else if (result.error === 'Usuario no encontrado') {
-          setError('No existe una cuenta con ese email.');
-        } else if (result.error === 'Contraseña incorrecta') {
-          setError('Contraseña incorrecta.');
-        } else if (result.error === 'Configuration' || result.error === 'NEXTAUTH_URL') {
-          setError('Error de configuración de autenticación. Recargá la página e intentá de nuevo.');
-        } else {
-          setError(result.error);
-        }
-      } else {
+      if (result?.ok && !result.error) {
         router.replace('/dashboard');
+        return;
+      }
+
+      const authError = result?.error || '';
+      if (authError === 'DB_CONNECTION_ERROR') {
+        setError('No se puede conectar a la base de datos. En Vercel, DATABASE_URL tiene que ser un PostgreSQL público (Neon), no localhost.');
+      } else if (authError === 'Usuario no encontrado') {
+        setError('No existe una cuenta con ese email.');
+      } else if (authError === 'Contraseña incorrecta') {
+        setError('Contraseña incorrecta.');
+      } else if (authError === 'Configuration' || authError === 'NEXTAUTH_URL') {
+        setError('Error de configuración de autenticación. Recargá la página e intentá de nuevo.');
+      } else {
+        setError('No se pudo iniciar sesión. Verificá email y contraseña.');
       }
     } catch {
       setError('Error de conexión. Intentá nuevamente.');
